@@ -1,6 +1,6 @@
 # The public dossier: the suite examined by its own fifth tool
 
-The four public records of the Cascade suite, read at their home paths and judged by
+The four public records of the Crusetra suite, read at their home paths and judged by
 the five controls on 2026-09-07, under the declared default validity period of 90 day(s). This is the house asking itself the question it sells.
 
 - coverage: 4 of 4 suite records present
