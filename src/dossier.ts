@@ -19,7 +19,7 @@
  * sur un rapport truffé de sentinelles.
  */
 /* piege:ok facade-en-francais — le mot « dossier » est LE NOM ANGLAIS du produit
-   (Cascade · Dossier) : les phrases anglaises destinées au client le portent
+   (Crusetra · Dossier) : les phrases anglaises destinées au client le portent
    légitimement, et la liste française de la règle le compte comme un mot français.
    Même faux positif de domaine que dossier.ts/facteur.ts chez l'améthyste : signalé
    au chef pour un témoin côté règle. */

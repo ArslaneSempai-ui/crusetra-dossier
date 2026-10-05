@@ -22,9 +22,9 @@ import { run, table } from "./figures.ts";
 export const COMMANDES: [string, string][] = [
   ["npm ci --ignore-scripts", "install exactly the versions the lockfile pins, and run no install script from any dependency; the only command that needs the network: this tool downloads nothing else, ever"],
   ["npm run test", "types, the README blocks, the licence inventory, and the suite. Start here; it runs with the network cut"],
-  ["npm run measure [-- --yes-overwrite]", "the public dossier: the four public records of the Cascade suite, read at their home paths and judged by the five controls, sealed into `releve-public.json` and readable in `RELEVE-PUBLIC.md`: a suite record absent that day is a question said absent, never guessed, and a sealed record is not overwritten without the flag"],
+  ["npm run measure [-- --yes-overwrite]", "the public dossier: the four public records of the Crusetra suite, read at their home paths and judged by the five controls, sealed into `releve-public.json` and readable in `RELEVE-PUBLIC.md`: a suite record absent that day is a question said absent, never guessed, and a sealed record is not overwritten without the flag"],
   ["npm run dossier -- --reports=<a.json>,... [--validity=90] [--as-of=<day>]", "your own chain: one to four measure:yours reports of the suite, their marks read (seals, dates, signature, never their content), judged by the five controls; the state reached is the highest control held WITHOUT A GAP, and the dossier is sealed so a reviewer verifies it without us"],
-  ["npm run sceller -- <record.json>", "seal a record: the content hash that makes a silently edited measurement fail loudly; the same content hash as cascade-routing"],
+  ["npm run sceller -- <record.json>", "seal a record: the content hash that makes a silently edited measurement fail loudly; the same content hash as Crusetra Routing"],
   ["npm run verify -- <report>", "check that a report was issued by the holder of the suite's public key, `cle-publique.pem`, without asking us"],
   ["npm run licences", "regenerate `LICENCES.md`, the licence of every shipped package; `--check` fails the suite when the table drifts"],
 ];

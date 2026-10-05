@@ -135,7 +135,7 @@ export function mesurePublique(reglages: Reglages): {
 
 export function rendrePublic(m: ReturnType<typeof mesurePublique>): string {
   const l: string[] = [`# The public dossier: the suite examined by its own fifth tool`, ``];
-  l.push(`The four public records of the Cascade suite, read at their home paths and judged by`);
+  l.push(`The four public records of the Crusetra suite, read at their home paths and judged by`);
   l.push(`the five controls on ${m.date}, under the declared default validity period of `
     + `${m.reglages.rythmeJours} day(s). This is the house asking itself the question it sells.`);
   l.push(``);

@@ -13,7 +13,7 @@
  * le droit de toucher le réseau : il n'y a ni liste à descendre ni poids à tirer. Tout site
  * d'envoi fait tomber ce cas AVANT qu'un client l'exécute. Le jour où un téléchargeur
  * légitime arrive, il entre dans AUTORISES avec sa raison, et le test qui suit exige qu'il
- * lise CASCADE_OFFLINE.
+ * lise CRUSETRA_OFFLINE et son ancien nom CASCADE_OFFLINE, gardé comme alias.
  *
  * Le détecteur porte son témoin : s'il ne voyait plus un `fetch(` planté dans une chaîne,
  * le zéro qu'il rend ne prouverait rien.
@@ -70,12 +70,29 @@ test("aucun module ne touche le réseau", () => {
     + "    d'envoi s'ajoute à AUTORISES avec sa raison, ou ne s'ajoute pas.");
 });
 
-test("un téléchargeur autorisé, s'il en vient un, obéit à CASCADE_OFFLINE", () => {
+/** Les noms du drapeau hors ligne qu'un téléchargeur doit lire, et qu'il ne lit pas.
+ *  CRUSETRA_OFFLINE est le nom ; CASCADE_OFFLINE, l'ancien, reste un alias (5/10/2026) : un
+ *  client qui l'a posé doit rester hors ligne exactement comme avant. */
+export function drapeauxHorsLigneManquants(src: string): string[] {
+  return ["CRUSETRA_OFFLINE", "CASCADE_OFFLINE"].filter((nom) => !new RegExp(`\\b${nom}\\b`).test(src));
+}
+
+test("un téléchargeur autorisé, s'il en vient un, obéit à CRUSETRA_OFFLINE et à son alias CASCADE_OFFLINE", () => {
+  /* TÉMOIN D'ABORD : AUTORISES est vide ici, la boucle ne lit rien ; la règle doit quand même
+     savoir dire non, sinon le jour où un téléchargeur arrive elle laisse passer l'un des deux noms. */
+  assert.deepEqual(drapeauxHorsLigneManquants(`(process.env.CRUSETRA_OFFLINE ?? process.env.CASCADE_OFFLINE) === "1"`), []);
+  assert.deepEqual(drapeauxHorsLigneManquants(`process.env.CASCADE_OFFLINE === "1"`), ["CRUSETRA_OFFLINE"],
+    "un téléchargeur qui ne lit que l'ancien nom doit rougir");
+  assert.deepEqual(drapeauxHorsLigneManquants(`process.env.CRUSETRA_OFFLINE === "1"`), ["CASCADE_OFFLINE"],
+    "un téléchargeur qui oublie l'alias doit rougir : un client qui l'a posé repasserait en ligne");
+  assert.deepEqual(drapeauxHorsLigneManquants(`process.env.XCRUSETRA_OFFLINE_2; MY_CASCADE_OFFLINE`),
+    ["CRUSETRA_OFFLINE", "CASCADE_OFFLINE"], "un nom voisin n'est pas le drapeau");
   for (const nom of Object.keys(AUTORISES)) {
     const chemin = join(dossier, nom);
     if (!existsSync(chemin)) continue;   /* autorisé mais pas encore écrit : rien à feindre */
-    const src = readFileSync(chemin, "utf8");
-    assert.match(src, /CASCADE_OFFLINE/,
-      `${nom} touche le réseau sans lire CASCADE_OFFLINE : la mesure hors ligne ne peut pas le retenir.`);
+    const manquants = drapeauxHorsLigneManquants(readFileSync(chemin, "utf8"));
+    assert.deepEqual(manquants, [],
+      `${nom} touche le réseau sans lire ${manquants.join(" ni ")} : CRUSETRA_OFFLINE=1 (ou l'ancien `
+      + "CASCADE_OFFLINE=1) ne peut pas le retenir.");
   }
 });
