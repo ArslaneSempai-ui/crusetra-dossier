@@ -10,6 +10,7 @@
  * Poser le scellé sur un relevé de mesures.
  *
  *   npm run sceller -- <fichier.json>
+ *   npm run sceller -- <fichier.json> --check     vérifie, n'écrit jamais (0 tient, 1 manque ou ne tient plus)
  *
  * CE QUE POSER UN SCELLÉ VEUT DIRE, ET IL FAUT QUE CE SOIT DÉSAGRÉABLE À LIRE : vous
  * déclarez que le contenu actuel du fichier est celui qui doit faire foi. L'empreinte
@@ -25,8 +26,17 @@ import { isMain, refuserDrapeauxInconnus } from "./cli.ts";
 import { empreinteDuReleve } from "./empreinte.ts";
 
 if (isMain(import.meta)) {
-  refuserDrapeauxInconnus([]);
-  const cible = process.argv[2];
+  /*
+   * `--check` : VÉRIFIER SANS ÉCRIRE (parcours client du 5 octobre 2026).
+   *
+   * Sans lui, « vérifier un scellé » et « déclarer un nouveau scellé » étaient le même geste : passer un relevé
+   * édité RÉÉCRIVAIT son scellé et sortait en 0, pendant que la page Screening et nos réponses promettent « a seal
+   * anyone can check ». Avec `--check` : 0 quand le scellé tient, 1 quand il manque ou ne correspond plus, et rien
+   * n'est écrit. Même drapeau, mêmes mots que le sceller de cascade-routing.
+   */
+  refuserDrapeauxInconnus(["--check"]);
+  const check = process.argv.includes("--check");
+  const cible = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (cible === undefined) {
     console.error("  usage: npm run sceller -- <record.json>\n  There is no default record here: name the file you are sealing.");
     process.exit(2);
@@ -49,6 +59,13 @@ if (isMain(import.meta)) {
   if (avant === apres) {
     console.log(`  ${cible}\n  already sealed, and the seal matches: ${apres}. Nothing to do.`);
     process.exit(0);
+  }
+  if (check) {
+    console.error(`  ${cible}`);
+    console.error(avant
+      ? `  SEAL DOES NOT MATCH: the file carries ${avant}, its content hashes to ${apres}.\n  It was edited after it was sealed. Nothing was written (--check).`
+      : `  NOT SEALED: the file carries no seal. Nothing was written (--check).\n  \`npm run sceller -- ${cible}\` would declare the current content as the one that stands.`);
+    process.exit(1);
   }
 
   brut.empreinte = apres;
