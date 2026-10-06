@@ -33,6 +33,7 @@ import type { RapportLu } from "./rapport-lu.ts";
 import { empreinteDuReleve } from "./empreinte.ts";
 import { ASSUMPTIONS, reglagesAvec, ligneDHypothese } from "./assumptions.ts";
 import { table } from "./figures.ts";
+import { lignesEvaluationDe } from "./evaluation.ts";
 
 export type QuestionDossier = {
   outil: OutilId;
@@ -226,6 +227,7 @@ export function executer(
 }
 
 async function principal(): Promise<void> {
+  for (const l of lignesEvaluationDe("dossier")) console.log(l);
   refuserDrapeauxInconnus(["--reports", "--validity", "--rhythm", "--as-of"]);
   const arg = (nom: string) => process.argv.find((a) => a.startsWith(`--${nom}=`))?.split("=").slice(1).join("=");
   const brutReports = arg("reports");

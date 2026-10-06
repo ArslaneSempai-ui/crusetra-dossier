@@ -105,10 +105,13 @@ test("l'ancien nom du drapeau se refuse en nommant le nouveau", () => {
    * commande ; sans ce cas, il suffirait de retirer `--rhythm` des drapeaux connus pour rendre
    * le refus muet et laisser un acheteur chercher.
    */
+  /* La commande imprime d'abord l'horloge d'évaluation, qui écrit son marqueur dans le dossier
+     personnel : un dossier fabriqué, pour que la suite ne démarre jamais l'horloge du poste. */
+  const maison = mkdtempSync(join(tmpdir(), "dossier-maison-"));
   const r = spawnSync(process.execPath, [
     fileURLToPath(new URL("./dossier.ts", import.meta.url)),
     "--reports=x.json", "--rhythm=90",
-  ], { encoding: "utf8" });
+  ], { encoding: "utf8", env: { ...process.env, HOME: maison, USERPROFILE: maison } });
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stderr, /--rhythm was renamed --validity/, "le refus ne dit pas le nouveau nom");
   assert.match(r.stderr, /--validity=90/, "le refus ne réécrit pas la commande pour le lecteur");
