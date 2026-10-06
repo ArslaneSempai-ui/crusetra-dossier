@@ -9,7 +9,8 @@ import type { RapportLu } from "./rapport-lu.ts";
  * LE LECTEUR (lot D1) : les quatre formats tels qu'ils EXISTENT dans les dépôts, lus sans
  * rien leur demander de changer. Ce que chaque outil écrit vraiment (relevé du 8/09) :
  *
- *   cascade      kind "cascade-client-record"     version 1, measuredAt ISO, source.sha256,
+ *   routing      kind "crusetra-client-record"    version 1, measuredAt ISO, source.sha256,
+ *                (avant le 5/10/2026 : "cascade-client-record", toujours lu)
  *                empreinte (racine), recommendation = des lignes par champ (pas une règle)
  *   screening    kind "screening-client-record"   idem ; paliers/absents ; pas de règle en JSON
  *   monitoring   kind "monitoring-client-record"  idem ; echelles photographiées
@@ -30,10 +31,15 @@ import { verifierDetachee, type SignatureDetachee } from "./signature.ts";
 import { OUTILS, type OutilId } from "./controle.ts";
 
 /** kind écrit par chaque outil → l'identifiant de la suite. Dérivé d'OUTILS : un outil
- *  ajouté au contrat ne compile pas tant que son kind n'est pas écrit ici. */
-const KIND_VERS_OUTIL: Record<string, OutilId> = Object.fromEntries(
-  OUTILS.map((o) => [`${o === "routing" ? "cascade" : o}-client-record`, o]),
-) as Record<string, OutilId>;
+ *  ajouté au contrat ne compile pas tant que son kind n'est pas écrit ici. Le vert écrit
+ *  « crusetra-client-record » depuis le changement de nom (5/10/2026). Une Map et pas un
+ *  objet : un kind « constructor » ne doit pas trouver Object.prototype au lieu d'un refus. */
+const KIND_VERS_OUTIL = new Map<string, OutilId>([
+  ...OUTILS.map((o): [string, OutilId] => [`${o === "routing" ? "crusetra" : o}-client-record`, o]),
+  /* L'ANCIEN NOM, LU À VIE : les rapports déjà remis aux clients sont scellés et signés
+     sous « cascade-client-record ». On ne les réécrit jamais ; le lecteur les accepte. */
+  ["cascade-client-record", "routing"],
+]);
 
 /** Une chaîne, ou null : jamais une coercition silencieuse d'un objet vers "[object Object]". */
 const chaineOuNull = (x: unknown): string | null => (typeof x === "string" && x.length > 0 ? x : null);
@@ -55,12 +61,12 @@ export function lireRapport(chemin: string, clePubliquePem?: string): RapportLu 
   const kind = chaineOuNull(json.kind);
   if (kind === null) {
     throw new Error(`${nom}: no "kind" field; this JSON does not say which tool wrote it.\n`
-      + `  Accepted: ${Object.keys(KIND_VERS_OUTIL).join(", ")}.`);
+      + `  Accepted: ${[...KIND_VERS_OUTIL.keys()].join(", ")}.`);
   }
-  const outil = KIND_VERS_OUTIL[kind];
+  const outil = KIND_VERS_OUTIL.get(kind);
   if (outil === undefined) {
     throw new Error(`${nom}: kind "${kind}" is not a tool of this suite.\n`
-      + `  Accepted: ${Object.keys(KIND_VERS_OUTIL).join(", ")}.`);
+      + `  Accepted: ${[...KIND_VERS_OUTIL.keys()].join(", ")}.`);
   }
 
   /* La date : le JOUR de measuredAt, seulement s'il se lit ; jamais deviné. */

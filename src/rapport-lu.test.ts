@@ -7,11 +7,13 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateKeyPairSync, sign as signerBrut } from "node:crypto";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign as signerBrut } from "node:crypto";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { lireRapport } from "./rapport-lu-lecteur.ts";
+import { lireRelevePublic } from "./measure.ts";
 import { empreinteDuReleve } from "./empreinte.ts";
 import { empreinteDeCle, verifier, verifierDetachee } from "./signature.ts";
 
@@ -33,7 +35,7 @@ function rapportFactice(kind: string, ecarts: Record<string, unknown> = {}, scel
 
 test("les quatre formats de la suite se lisent, chacun vers son outil", () => {
   const attendus: [string, string][] = [
-    ["cascade-client-record", "routing"],
+    ["crusetra-client-record", "routing"],
     ["screening-client-record", "screening"],
     ["monitoring-client-record", "monitoring"],
     /* L3 de l'améthyste n'a pas livré : la convention de famille, remplacée par son message. */
@@ -60,10 +62,59 @@ test("les refus du lecteur disent quoi corriger, sans citer que le nom du fichie
   assert.throws(() => lireRapport(pasJson), /not readable JSON/);
   const sansKind = join(dossier, "sans-kind.json");
   writeFileSync(sansKind, JSON.stringify({ version: 1 }));
-  assert.throws(() => lireRapport(sansKind), /no "kind" field[\s\S]*cascade-client-record/);
+  assert.throws(() => lireRapport(sansKind), /no "kind" field[\s\S]*crusetra-client-record[\s\S]*cascade-client-record/,
+    "le refus nomme le kind du vert ET son ancien nom, que le lecteur accepte toujours");
   const horsSuite = join(dossier, "hors.json");
   writeFileSync(horsSuite, JSON.stringify({ kind: "invoicing-client-record" }));
   assert.throws(() => lireRapport(horsSuite), /not a tool of this suite/);
+  const prototype = join(dossier, "prototype.json");
+  writeFileSync(prototype, JSON.stringify({ kind: "constructor" }));
+  assert.throws(() => lireRapport(prototype), /not a tool of this suite/,
+    "un nom hérité d'Object.prototype n'est pas un outil de la suite");
+});
+
+/* ─── le changement de nom du 5/10/2026 : l'ancien kind du vert se lit à vie ─── */
+
+/** Un rapport du vert DÉJÀ LIVRÉ sous l'ancien kind : copié octet pour octet de
+ *  cascade/examples/cord-receipts au commit 2bd9a89 (4/10/2026), scellé et signé par la maison.
+ *  L'empreinte des octets prouve que la copie n'a pas été retouchée ; on ne la rescelle jamais. */
+const RAPPORT_LIVRE = fileURLToPath(new URL("fixtures/cord-labels-grouped-tesseract-measured.json", import.meta.url));
+const OCTETS_DU_RAPPORT_LIVRE = "ccf970ceacd11cee7ecf4baadcee10b5bcdf8ca31ac4995cbb959d77fc0af031";
+
+test("l'ancien kind du vert se lit toujours : un rapport livré, scellé et signé, n'est jamais réécrit", () => {
+  const octets = readFileSync(RAPPORT_LIVRE);
+  assert.equal(createHash("sha256").update(octets).digest("hex"), OCTETS_DU_RAPPORT_LIVRE,
+    "la copie du rapport livré a changé : elle doit rester les octets du dépôt du vert");
+  assert.equal(JSON.parse(octets.toString("utf8")).kind, "cascade-client-record");
+  const r = lireRapport(RAPPORT_LIVRE);
+  assert.equal(r.outil, "routing", "l'ancien kind désigne toujours le vert");
+  assert.equal(r.mesureLe, "2026-10-04");
+  assert.equal(r.sceauPorte, "1817f176853fc0e9");
+  assert.equal(r.sceauCalcule, r.sceauPorte, "le sceau posé avant le changement de nom tient encore");
+  const signature = JSON.parse(readFileSync(RAPPORT_LIVRE.replace(/\.json$/, ".signature.json"), "utf8"));
+  const cle = readFileSync(fileURLToPath(new URL("../cle-publique.pem", import.meta.url)), "utf8");
+  assert.equal(verifierDetachee(r.sceauPorte!, signature, cle).valide, true,
+    "la signature de la maison sur ce sceau se vérifie toujours contre cle-publique.pem");
+
+  /* Les deux noms, côte à côte, sur un rapport factice : le même outil, le même sceau. */
+  for (const kind of ["cascade-client-record", "crusetra-client-record"]) {
+    const lu = lireRapport(rapportFactice(kind));
+    assert.equal(lu.outil, "routing", `${kind} doit se lire comme un rapport du vert`);
+    assert.equal(lu.sceauPorte, lu.sceauCalcule);
+  }
+
+  /* Le relevé PUBLIC du vert porte lui aussi un kind (« cascade-routing-record » dans le relevé
+     scellé du 20/08, « crusetra-routing-record » à la prochaine mesure). Le dossier le lit par ses
+     marques : les deux noms doivent donner le même jugement, sans qu'aucun soit refusé. */
+  for (const kind of ["cascade-routing-record", "crusetra-routing-record"]) {
+    const releve: Record<string, unknown> = { kind, version: 1, measuredAt: "2026-08-20T10:40:28.826Z" };
+    releve.empreinte = empreinteDuReleve(releve);
+    const chemin = join(dossier, `${kind}.json`);
+    writeFileSync(chemin, JSON.stringify(releve));
+    const lu = lireRelevePublic("routing", chemin);
+    assert.equal(lu.mesureLe, "2026-08-20", `${kind} : la date se lit`);
+    assert.equal(lu.sceauPorte, lu.sceauCalcule, `${kind} : le sceau tient`);
+  }
 });
 
 test("une marque absente est un null nommé, jamais deviné", () => {

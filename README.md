@@ -11,7 +11,7 @@ them by five controls, and seals one dossier that states the highest control the
 without a gap.
 
 It is the fifth tool of the Crusetra suite. The first,
-[Crusetra Routing](https://github.com/ArslaneSempai-ui/cascade-routing), measures which
+[Crusetra Routing](https://github.com/ArslaneSempai-ui/crusetra-routing), measures which
 extraction tier suffices per field. Same method, same seal, same key.
 
 The Dossier writes no measurement of its own. It reads the marks of the four records, their
@@ -56,7 +56,7 @@ reports are verified against the same public key, [`cle-publique.pem`](cle-publi
 with `npm run verify`.
 
 <!-- figures:tests -->
-**63 tests** across 13 files, counted by running the suite rather than typed here.
+**64 tests** across 13 files, counted by running the suite rather than typed here.
 <!-- /figures:tests -->
 
 ## Licence
