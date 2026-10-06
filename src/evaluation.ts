@@ -39,9 +39,17 @@ import { dirname, join } from "node:path";
 /** Le même nombre que la clause ; un test vérifie que LICENCES.md dit toujours trente. */
 export const JOURS_EVALUATION = 30;
 
-/* Même maison (~/.cascade), un marqueur PAR OUTIL : l'évaluation de Screening ne
+/* Même maison (~/.crusetra), un marqueur PAR OUTIL : l'évaluation de Screening ne
    consomme pas les trente jours de Routing, ni l'inverse. */
-export const FICHIER_DEFAUT = join(homedir(), ".cascade", "premiere-utilisation-screening.json");
+export const FICHIER_DEFAUT = join(homedir(), ".crusetra", "premiere-utilisation-screening.json");
+
+/* L'ANCIENNE MAISON (~/.cascade), d'avant le nom Crusetra (5 octobre 2026). Un client qui
+   évaluait déjà a son premier usage écrit là. Changer de nom ne doit JAMAIS remettre son
+   compteur à zéro, ni le prolonger : le marqueur ancien est donc lu, jamais écrit, jamais
+   effacé, et quand les deux existent la date la PLUS ANCIENNE l'emporte. Seul le chemin par
+   défaut consulte l'ancienne maison : un appelant qui nomme son fichier (les tests) ne lit
+   pas le vrai ~/.cascade du poste. */
+export const FICHIER_ANCIEN = join(homedir(), ".cascade", "premiere-utilisation-screening.json");
 
 export interface PremierUsage {
   premiere: string;          // ISO du premier lancement
@@ -50,33 +58,56 @@ export interface PremierUsage {
   ecritureRatee?: string;    // la raison, si le marqueur n'a pas pu être écrit
 }
 
-/** Lit le marqueur de premier usage, ou le crée. Ne lève jamais : une mesure ne doit
- *  pas échouer parce qu'un disque refuse une écriture — mais le raté se DIT. */
-export function marquer(fichier: string = FICHIER_DEFAUT, maintenant: Date = new Date()): PremierUsage {
-  let avarie = false;
-  if (existsSync(fichier)) {
-    try {
-      const lu = JSON.parse(readFileSync(fichier, "utf8")) as { premiereUtilisation?: string };
-      const d = new Date(lu.premiereUtilisation ?? "");
-      if (!Number.isNaN(d.getTime())) {
-        return { premiere: d.toISOString(), neuf: false, avarie: false };
-      }
-      avarie = true;
-    } catch {
-      avarie = true;
-    }
+/** La date qu'un marqueur porte : absente si le fichier n'existe pas, avariée s'il ne se lit pas. */
+function lireMarqueur(fichier: string): { date: Date | null; avarie: boolean } {
+  if (!existsSync(fichier)) return { date: null, avarie: false };
+  try {
+    const lu = JSON.parse(readFileSync(fichier, "utf8")) as { premiereUtilisation?: string };
+    const d = new Date(lu.premiereUtilisation ?? "");
+    return Number.isNaN(d.getTime()) ? { date: null, avarie: true } : { date: d, avarie: false };
+  } catch {
+    return { date: null, avarie: true };
   }
-  const premiere = maintenant.toISOString();
+}
+
+/** Écrit le marqueur ; rend la raison d'un raté, ou undefined. */
+function ecrireMarqueur(fichier: string, premiere: string): string | undefined {
   try {
     mkdirSync(dirname(fichier), { recursive: true });
     writeFileSync(fichier, JSON.stringify({
       premiereUtilisation: premiere,
       note: "local only, never transmitted; the thirty-day evaluation clause in LICENCES.md counts from this date",
     }, null, 2) + "\n");
+    return undefined;
   } catch (e) {
-    return { premiere, neuf: true, avarie, ecritureRatee: (e as Error).message };
+    return (e as Error).message;
   }
-  return { premiere, neuf: true, avarie };
+}
+
+/** Lit le marqueur de premier usage, ou le crée. Ne lève jamais : une mesure ne doit
+ *  pas échouer parce qu'un disque refuse une écriture, mais le raté se DIT.
+ *  `ancien` : le marqueur d'avant le nom Crusetra, lu après `fichier` ; la date la plus
+ *  ancienne des deux est reportée dans `fichier` et l'ancien n'est jamais touché. */
+export function marquer(
+  fichier: string = FICHIER_DEFAUT,
+  maintenant: Date = new Date(),
+  ancien: string | null = fichier === FICHIER_DEFAUT ? FICHIER_ANCIEN : null,
+): PremierUsage {
+  const nouveau = lireMarqueur(fichier);
+  const vieux = ancien === null ? { date: null, avarie: false } : lireMarqueur(ancien);
+  const connues = [nouveau.date, vieux.date].filter((d): d is Date => d !== null);
+  if (connues.length > 0) {
+    const premiere = new Date(Math.min(...connues.map((d) => d.getTime()))).toISOString();
+    if (nouveau.date !== null && nouveau.date.toISOString() === premiere) {
+      return { premiere, neuf: false, avarie: false };
+    }
+    /* la date vient de l'ancienne maison : elle passe dans la nouvelle, telle quelle */
+    const ecritureRatee = ecrireMarqueur(fichier, premiere);
+    return { premiere, neuf: false, avarie: false, ...(ecritureRatee ? { ecritureRatee } : {}) };
+  }
+  const premiere = maintenant.toISOString();
+  const ecritureRatee = ecrireMarqueur(fichier, premiere);
+  return { premiere, neuf: true, avarie: nouveau.avarie || vieux.avarie, ...(ecritureRatee ? { ecritureRatee } : {}) };
 }
 
 /** Jour 1 le jour du premier usage ; jamais moins que 1 même si l'horloge recule. */
@@ -87,8 +118,12 @@ export function jourDepuis(premiereIso: string, maintenant: Date = new Date()): 
 
 /** Les lignes à imprimer en tête d'une commande de mesure. Anglais, comme toute la
  *  façade ; le point médian plutôt que le tiret, comme tout ce que la maison publie. */
-export function lignesEvaluation(fichier: string = FICHIER_DEFAUT, maintenant: Date = new Date()): string[] {
-  const u = marquer(fichier, maintenant);
+export function lignesEvaluation(
+  fichier: string = FICHIER_DEFAUT,
+  maintenant: Date = new Date(),
+  ancien: string | null = fichier === FICHIER_DEFAUT ? FICHIER_ANCIEN : null,
+): string[] {
+  const u = marquer(fichier, maintenant, ancien);
   const date = u.premiere.slice(0, 10);
   const j = jourDepuis(u.premiere, maintenant);
   const sortie: string[] = [];
@@ -105,7 +140,7 @@ export function lignesEvaluation(fichier: string = FICHIER_DEFAUT, maintenant: D
   } else {
     sortie.push(`day ${j} since first use (${date}).`);
     sortie.push("If this was a commercial evaluation, its thirty days have passed. The next step");
-    sortie.push("is an engagement: https://cascade-routing.com/engagement.html");
+    sortie.push("is an engagement: https://crusetra.com/engagement.html");
     sortie.push("Noncommercial use has no clock (LICENCES.md).");
   }
   return sortie;
